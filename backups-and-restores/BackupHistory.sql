@@ -1,21 +1,21 @@
-SELECT 
-    @@Servername AS instance_name,
-    sd.name AS db_name, 
-    sd.recovery_model_desc AS recovery_model,
-    sdf.physical_name AS filename,
-    sdf.name AS logical_name,
-    (FILEPROPERTY(sdf.name, 'IsPrimaryFile')) AS primary_file,
-    (FILEPROPERTY(sdf.name, 'IsLogFile')) AS is_log_file,
-    CONVERT(DECIMAL(10,2), size/128.0/1024) AS size_GB,
-    CONVERT(DECIMAL(10,2), FILEPROPERTY(sdf.name, 'SpaceUsed')/128.0/1024) AS space_used,
-    CONVERT(DECIMAL(10,2), size/128.0/1024-(FILEPROPERTY(sdf.name, 'SpaceUsed')/128.0/1024)) AS space_available,
-    CONVERT(DECIMAL(10,2), (FILEPROPERTY(sdf.name, 'SpaceUsed')/(size/128.0))/128.0*100) AS pct_used,
-    sd.log_reuse_wait_desc
-FROM sys.database_files AS sdf
-CROSS APPLY
-(
-    SELECT * FROM sys.databases AS sdf
-    WHERE name = DB_NAME()
-) AS sd
--- Uncomment to show log files only
---WHERE (FILEPROPERTY(sdf.name, 'IsLogFile')) = 1
+SELECT TOP 100
+    s.database_name,
+    m.physical_device_name,
+    CAST(CAST(s.backup_size / 1000000 AS INT) AS VARCHAR(14)) + ' ' + 'MB' AS bkSize,
+    CAST(DATEDIFF(second, s.backup_start_date,
+        s.backup_finish_date) AS VARCHAR(4)) + ' ' + 'Seconds' TimeTaken,
+    s.backup_start_date,
+    CAST(s.first_lsn AS VARCHAR(50)) AS first_lsn,
+    CAST(s.last_lsn AS VARCHAR(50)) AS last_lsn,
+    CASE s.[type]
+        WHEN 'D' THEN 'Full'
+        WHEN 'I' THEN 'Differential'
+        WHEN 'L' THEN 'Transaction Log'
+    END AS BackupType,
+    s.server_name,
+    s.recovery_model
+FROM msdb.dbo.backupset s
+INNER JOIN msdb.dbo.backupmediafamily m ON s.media_set_id = m.media_set_id
+WHERE s.database_name = DB_NAME() -- Remove this line to see every database
+ORDER BY backup_start_date DESC, backup_finish_date
+GO
